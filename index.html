@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Bounding Box → LaTeX Macro Generator</title>
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-tertiary: #0f3460;
+      --accent: #e94560;
+      --accent-hover: #ff6b6b;
+      --text-primary: #eaeaea;
+      --text-secondary: #a0a0a0;
+      --border: #2a2a4a;
+      --success: #4ecca3;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      --font-sans: 'Segoe UI', system-ui, sans-serif;
+      --sidebar-width: 380px;
+      
+      /* Syntax highlighting */
+      --syn-command: #e94560;
+      --syn-argument: #4ecca3;
+      --syn-bracket: #ffc107;
+      --syn-comment: #6a6a8a;
+      --syn-keyword: #00d9ff;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      height: 100%;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header / Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .toolbar h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-right: auto;
+      letter-spacing: -0.02em;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .toolbar-group label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    button {
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    button:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button:disabled:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--border);
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    button.primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    select {
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Main Layout */
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* PDF Viewer Area */
+    .pdf-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0; /* Allow flex shrinking */
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(233, 69, 96, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(78, 204, 163, 0.05) 0%, transparent 50%),
+        var(--bg-primary);
+    }
+
+    .pdf-scroll-container {
+      flex: 1;
+      overflow: auto;
+      min-height: 0; /* Allow flex shrinking for scroll */
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .page-container {
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .page-container canvas.pdf-canvas {
+      display: block;
+      background: white;
+    }
+
+    .page-container canvas.draw-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      cursor: crosshair;
+    }
+
+    .page-label {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      font-size: 0.7rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 4rem;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      color: var(--text-secondary);
+      text-align: center;
+      margin: auto;
+    }
+
+    .placeholder-icon {
+      font-size: 3rem;
+      opacity: 0.5;
+    }
+
+    /* Resizer */
+    .resizer {
+      width: 6px;
+      background: var(--border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .resizer:hover,
+    .resizer.active {
+      background: var(--accent);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-width);
+      min-width: 280px;
+      max-width: 600px;
+      background: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section.flex-grow {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: var(--bg-tertiary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .sidebar-content {
+      padding: 1rem;
+      overflow: auto;
+    }
+
+    .sidebar-content.no-padding {
+      padding: 0;
+    }
+
+    /* Box List */
+    .box-list {
+      list-style: none;
+      padding: 0.5rem;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .box-list:empty::before {
+      content: 'Draw boxes on the PDF to begin';
+      display: block;
+      padding: 1rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-style: italic;
+      text-align: center;
+    }
+
+    .box-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.25rem;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      transition: all 0.15s ease;
+    }
+
+    .box-item:hover {
+      border-color: var(--accent);
+    }
+
+    .box-item.selected {
+      border-color: var(--accent);
+      background: rgba(233, 69, 96, 0.1);
+    }
+
+    .box-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .box-name {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 0.25rem;
+      border-radius: 3px;
+      min-width: 0;
+    }
+
+    .box-name:focus {
+      outline: none;
+      background: var(--bg-tertiary);
+    }
+
+    .box-page {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      padding: 0.15rem 0.4rem;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .box-delete {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 0.25rem;
+      font-size: 1rem;
+      line-height: 1;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .box-delete:hover {
+      color: var(--accent);
+      background: rgba(233, 69, 96, 0.2);
+    }
+
+    /* Format Selection */
+    .format-options {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .format-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .format-option input {
+      accent-color: var(--accent);
+    }
+
+    /* LaTeX Output */
+    .latex-section {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      padding-bottom: 0.5rem;
+    }
+
+    .latex-block {
+      display: flex;
+      flex-direction: column;
+      margin: 0.5rem 0.75rem;
+      min-height: 0;
+    }
+
+    .latex-block.flex-grow {
+      flex: 1;
+    }
+
+    .latex-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+    .latex-block-title {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .copy-icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .copy-icon-btn:hover {
+      color: var(--accent);
+      background: rgba(233, 69, 96, 0.1);
+    }
+
+    .copy-icon-btn.copied {
+      color: var(--success);
+    }
+
+    .latex-output {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      line-height: 1.5;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .latex-output.preamble {
+      max-height: 180px;
+      flex-shrink: 0;
+    }
+
+    .latex-output.macros {
+      flex: 1;
+      min-height: 100px;
+    }
+
+    .latex-output:empty::before {
+      content: '% Output will appear here...';
+      color: var(--text-secondary);
+    }
+
+    /* Syntax Highlighting */
+    .syn-command { color: var(--syn-command); }
+    .syn-argument { color: var(--syn-argument); }
+    .syn-bracket { color: var(--syn-bracket); }
+    .syn-comment { color: var(--syn-comment); font-style: italic; }
+    .syn-keyword { color: var(--syn-keyword); }
+    .syn-number { color: #ff9f43; }
+
+    /* Hidden file input */
+    #file-input {
+      display: none;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>PDF BB → LaTeX</h1>
+    <input type="file" id="file-input" accept=".pdf">
+    <button id="open-btn" class="primary">Open PDF</button>
+    <div class="toolbar-group">
+      <label>Zoom:</label>
+      <select id="zoom-select">
+        <option value="fit-width">Fit Width</option>
+        <option value="fit-height">Fit Height</option>
+        <option value="0.5">50%</option>
+        <option value="0.75">75%</option>
+        <option value="1" selected>100%</option>
+        <option value="1.25">125%</option>
+        <option value="1.5">150%</option>
+        <option value="2">200%</option>
+      </select>
+    </div>
+    <div class="toolbar-group">
+      <span id="page-info" style="font-size: 0.8rem; color: var(--text-secondary);">No PDF loaded</span>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <div class="pdf-area">
+      <div id="pdf-scroll-container" class="pdf-scroll-container">
+        <div id="pdf-placeholder" class="placeholder">
+          <div class="placeholder-icon">📄</div>
+          <div>Open a PDF file to get started</div>
+          <div style="font-size: 0.875rem;">Draw bounding boxes and generate LaTeX macros</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="resizer" class="resizer"></div>
+
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-header">Bounding Boxes</div>
+        <ul id="box-list" class="box-list"></ul>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-header">Output Format</div>
+        <div class="sidebar-content">
+          <div class="format-options">
+            <label class="format-option">
+              <input type="radio" name="format" value="tikz" checked>
+              TikZ
+            </label>
+            <label class="format-option">
+              <input type="radio" name="format" value="textpos">
+              textpos
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section flex-grow">
+        <div class="sidebar-header">LaTeX Output</div>
+        <div class="latex-section">
+          <div class="latex-block">
+            <div class="latex-block-header">
+              <span class="latex-block-title">Preamble</span>
+              <button class="copy-icon-btn" id="copy-preamble-btn" title="Copy preamble">
+                <span class="copy-icon">📋</span> Copy
+              </button>
+            </div>
+            <div id="latex-preamble" class="latex-output preamble"></div>
+          </div>
+          <div class="latex-block flex-grow">
+            <div class="latex-block-header">
+              <span class="latex-block-title">Macros</span>
+              <button class="copy-icon-btn" id="copy-macros-btn" title="Copy macros">
+                <span class="copy-icon">📋</span> Copy
+              </button>
+            </div>
+            <div id="latex-macros" class="latex-output macros"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module">
+    // PDF.js setup
+    const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+    // State
+    const state = {
+      pdfDoc: null,
+      totalPages: 0,
+      pages: [], // { canvas, drawCanvas, viewport, pageNum }
+      boxes: [], // { id, name, page, x, y, width, height, color } in PDF points
+      selectedBoxId: null,
+      isDrawing: false,
+      drawStart: null,
+      drawingPage: null,
+      zoomMode: '1', // '1', 'fit-width', 'fit-height', etc.
+    };
+
+    // DOM Elements
+    const fileInput = document.getElementById('file-input');
+    const openBtn = document.getElementById('open-btn');
+    const zoomSelect = document.getElementById('zoom-select');
+    const pageInfo = document.getElementById('page-info');
+    const pdfPlaceholder = document.getElementById('pdf-placeholder');
+    const pdfScrollContainer = document.getElementById('pdf-scroll-container');
+    const boxList = document.getElementById('box-list');
+    const latexPreamble = document.getElementById('latex-preamble');
+    const latexMacros = document.getElementById('latex-macros');
+    const copyPreambleBtn = document.getElementById('copy-preamble-btn');
+    const copyMacrosBtn = document.getElementById('copy-macros-btn');
+    const formatRadios = document.querySelectorAll('input[name="format"]');
+    const resizer = document.getElementById('resizer');
+    const sidebar = document.getElementById('sidebar');
+
+    // Color palette for boxes
+    const boxColors = [
+      '#e94560', '#4ecca3', '#00d9ff', '#ffc107', 
+      '#9c27b0', '#ff5722', '#8bc34a', '#03a9f4'
+    ];
+    let colorIndex = 0;
+
+    function getNextColor() {
+      const color = boxColors[colorIndex % boxColors.length];
+      colorIndex++;
+      return color;
+    }
+
+    function generateId() {
+      return 'box_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Resizer functionality
+    let isResizing = false;
+    resizer.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      resizer.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const containerRect = document.querySelector('.main-container').getBoundingClientRect();
+      const newWidth = containerRect.right - e.clientX;
+      const clampedWidth = Math.min(Math.max(newWidth, 280), 600);
+      sidebar.style.width = clampedWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        resizer.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+
+    // PDF Loading
+    openBtn.addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      try {
+        state.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        state.totalPages = state.pdfDoc.numPages;
+        state.boxes = [];
+        state.pages = [];
+        colorIndex = 0;
+        
+        pdfPlaceholder.style.display = 'none';
+        
+        await renderAllPages();
+        updatePageInfo();
+        updateBoxList();
+        updateLatexOutput();
+      } catch (err) {
+        console.error('Error loading PDF:', err);
+        alert('Error loading PDF: ' + err.message);
+      }
+    });
+
+    function getScale(page) {
+      const containerRect = pdfScrollContainer.getBoundingClientRect();
+      const defaultViewport = page.getViewport({ scale: 1 });
+      
+      if (state.zoomMode === 'fit-width') {
+        const availableWidth = containerRect.width - 48; // padding
+        return availableWidth / defaultViewport.width;
+      } else if (state.zoomMode === 'fit-height') {
+        const availableHeight = containerRect.height - 48;
+        return availableHeight / defaultViewport.height;
+      } else {
+        return parseFloat(state.zoomMode);
+      }
+    }
+
+    async function renderAllPages() {
+      // Clear existing pages
+      pdfScrollContainer.innerHTML = '';
+      state.pages = [];
+      
+      for (let pageNum = 1; pageNum <= state.totalPages; pageNum++) {
+        const page = await state.pdfDoc.getPage(pageNum);
+        const scale = getScale(page);
+        const viewport = page.getViewport({ scale });
+        
+        // Create page container
+        const container = document.createElement('div');
+        container.className = 'page-container';
+        container.dataset.page = pageNum;
+        
+        // PDF canvas
+        const pdfCanvas = document.createElement('canvas');
+        pdfCanvas.className = 'pdf-canvas';
+        pdfCanvas.width = viewport.width;
+        pdfCanvas.height = viewport.height;
+        
+        // Drawing canvas
+        const drawCanvas = document.createElement('canvas');
+        drawCanvas.className = 'draw-canvas';
+        drawCanvas.width = viewport.width;
+        drawCanvas.height = viewport.height;
+        drawCanvas.dataset.page = pageNum;
+        
+        // Page label
+        const label = document.createElement('div');
+        label.className = 'page-label';
+        label.textContent = `Page ${pageNum}`;
+        
+        container.appendChild(pdfCanvas);
+        container.appendChild(drawCanvas);
+        container.appendChild(label);
+        pdfScrollContainer.appendChild(container);
+        
+        // Render PDF
+        await page.render({
+          canvasContext: pdfCanvas.getContext('2d'),
+          viewport: viewport
+        }).promise;
+        
+        // Store page info
+        state.pages.push({
+          pageNum,
+          canvas: pdfCanvas,
+          drawCanvas,
+          viewport,
+          scale
+        });
+        
+        // Setup drawing events
+        setupDrawingEvents(drawCanvas, pageNum);
+      }
+      
+      redrawAllBoxes();
+    }
+
+    function setupDrawingEvents(drawCanvas, pageNum) {
+      drawCanvas.addEventListener('mousedown', (e) => {
+        const pos = canvasToPixel(e, drawCanvas);
+        
+        // Check if clicking on existing box
+        const clickedBox = getBoxAtPosition(pos.x, pos.y, pageNum);
+        if (clickedBox) {
+          state.selectedBoxId = clickedBox.id;
+          updateBoxList();
+          redrawAllBoxes();
+          return;
+        }
+        
+        state.isDrawing = true;
+        state.drawStart = pos;
+        state.drawingPage = pageNum;
+        state.selectedBoxId = null;
+      });
+
+      drawCanvas.addEventListener('mousemove', (e) => {
+        if (!state.isDrawing || state.drawingPage !== pageNum) return;
+        
+        const pos = canvasToPixel(e, drawCanvas);
+        redrawAllBoxes();
+        
+        // Draw current selection rectangle
+        const ctx = drawCanvas.getContext('2d');
+        ctx.strokeStyle = '#e94560';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(
+          state.drawStart.x,
+          state.drawStart.y,
+          pos.x - state.drawStart.x,
+          pos.y - state.drawStart.y
+        );
+        ctx.setLineDash([]);
+      });
+
+      drawCanvas.addEventListener('mouseup', (e) => {
+        if (!state.isDrawing || state.drawingPage !== pageNum) return;
+        state.isDrawing = false;
+        
+        const pageData = state.pages.find(p => p.pageNum === pageNum);
+        if (!pageData) return;
+        
+        const pos = canvasToPixel(e, drawCanvas);
+        const x = Math.min(state.drawStart.x, pos.x);
+        const y = Math.min(state.drawStart.y, pos.y);
+        const width = Math.abs(pos.x - state.drawStart.x);
+        const height = Math.abs(pos.y - state.drawStart.y);
+        
+        // Minimum size check
+        if (width < 10 || height < 10) {
+          redrawAllBoxes();
+          return;
+        }
+        
+        // Convert to PDF points
+        const pdfStart = pixelToPdfPoints(x, y, pageData.scale);
+        const pdfSize = pixelToPdfPoints(width, height, pageData.scale);
+        
+        const newBox = {
+          id: generateId(),
+          name: `Box${state.boxes.length + 1}`,
+          page: pageNum,
+          x: pdfStart.x,
+          y: pdfStart.y,
+          width: pdfSize.x,
+          height: pdfSize.y,
+          color: getNextColor()
+        };
+        
+        state.boxes.push(newBox);
+        state.selectedBoxId = newBox.id;
+        
+        updateBoxList();
+        updateLatexOutput();
+        redrawAllBoxes();
+      });
+
+      drawCanvas.addEventListener('mouseleave', () => {
+        if (state.isDrawing && state.drawingPage === pageNum) {
+          // Redraw to clear the temporary rectangle
+          redrawAllBoxes();
+        }
+      });
+    }
+
+    function canvasToPixel(e, canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    function pixelToPdfPoints(px, py, scale) {
+      return {
+        x: px / scale,
+        y: py / scale
+      };
+    }
+
+    function pdfPointsToPixel(pdfX, pdfY, scale) {
+      return {
+        x: pdfX * scale,
+        y: pdfY * scale
+      };
+    }
+
+    function getBoxAtPosition(px, py, pageNum) {
+      const pageData = state.pages.find(p => p.pageNum === pageNum);
+      if (!pageData) return null;
+      
+      const pageBoxes = state.boxes.filter(b => b.page === pageNum);
+      // Check in reverse order (top-most first)
+      for (let i = pageBoxes.length - 1; i >= 0; i--) {
+        const box = pageBoxes[i];
+        const pixelPos = pdfPointsToPixel(box.x, box.y, pageData.scale);
+        const pixelSize = pdfPointsToPixel(box.width, box.height, pageData.scale);
+        
+        if (px >= pixelPos.x && px <= pixelPos.x + pixelSize.x &&
+            py >= pixelPos.y && py <= pixelPos.y + pixelSize.y) {
+          return box;
+        }
+      }
+      return null;
+    }
+
+    function redrawAllBoxes() {
+      for (const pageData of state.pages) {
+        const ctx = pageData.drawCanvas.getContext('2d');
+        ctx.clearRect(0, 0, pageData.drawCanvas.width, pageData.drawCanvas.height);
+        
+        const pageBoxes = state.boxes.filter(b => b.page === pageData.pageNum);
+        
+        for (const box of pageBoxes) {
+          const pixelPos = pdfPointsToPixel(box.x, box.y, pageData.scale);
+          const pixelSize = pdfPointsToPixel(box.width, box.height, pageData.scale);
+          
+          const isSelected = box.id === state.selectedBoxId;
+          
+          // Fill
+          ctx.fillStyle = box.color + '20';
+          ctx.fillRect(pixelPos.x, pixelPos.y, pixelSize.x, pixelSize.y);
+          
+          // Stroke
+          ctx.strokeStyle = box.color;
+          ctx.lineWidth = isSelected ? 3 : 2;
+          ctx.strokeRect(pixelPos.x, pixelPos.y, pixelSize.x, pixelSize.y);
+          
+          // Label
+          ctx.font = 'bold 12px system-ui';
+          ctx.fillStyle = box.color;
+          const textY = pixelPos.y > 20 ? pixelPos.y - 5 : pixelPos.y + 15;
+          ctx.fillText(box.name, pixelPos.x, textY);
+        }
+      }
+    }
+
+    // Zoom handling
+    zoomSelect.addEventListener('change', async () => {
+      state.zoomMode = zoomSelect.value;
+      if (state.pdfDoc) {
+        await renderAllPages();
+      }
+    });
+
+    function updatePageInfo() {
+      pageInfo.textContent = `${state.totalPages} page${state.totalPages !== 1 ? 's' : ''}`;
+    }
+
+    // Box List Management
+    function updateBoxList() {
+      boxList.innerHTML = '';
+      
+      for (const box of state.boxes) {
+        const li = document.createElement('li');
+        li.className = 'box-item' + (box.id === state.selectedBoxId ? ' selected' : '');
+        li.innerHTML = `
+          <span class="box-color" style="background: ${box.color}"></span>
+          <input type="text" class="box-name" value="${escapeHtml(box.name)}" data-id="${box.id}">
+          <span class="box-page">p${box.page}</span>
+          <button class="box-delete" data-id="${box.id}">×</button>
+        `;
+        
+        li.addEventListener('click', (e) => {
+          if (e.target.classList.contains('box-delete') || e.target.classList.contains('box-name')) return;
+          state.selectedBoxId = box.id;
+          // Scroll to page
+          const pageContainer = pdfScrollContainer.querySelector(`.page-container[data-page="${box.page}"]`);
+          if (pageContainer) {
+            pageContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          updateBoxList();
+          redrawAllBoxes();
+        });
+        
+        boxList.appendChild(li);
+      }
+      
+      // Event delegation for name changes
+      boxList.querySelectorAll('.box-name').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const box = state.boxes.find(b => b.id === e.target.dataset.id);
+          if (box) {
+            // Allow alphanumeric and periods, but must start with letter
+            let name = e.target.value.replace(/[^a-zA-Z0-9.]/g, '');
+            // Ensure starts with a letter
+            if (!/^[a-zA-Z]/.test(name)) {
+              name = 'Box' + name;
+            }
+            box.name = name || 'Box';
+            e.target.value = box.name;
+            updateLatexOutput();
+            redrawAllBoxes();
+          }
+        });
+      });
+      
+      // Event delegation for delete buttons
+      boxList.querySelectorAll('.box-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = e.target.dataset.id;
+          state.boxes = state.boxes.filter(b => b.id !== id);
+          if (state.selectedBoxId === id) state.selectedBoxId = null;
+          updateBoxList();
+          updateLatexOutput();
+          redrawAllBoxes();
+        });
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // LaTeX Generation
+    function getSelectedFormat() {
+      return document.querySelector('input[name="format"]:checked').value;
+    }
+
+    function generatePreamble() {
+      const format = getSelectedFormat();
+      
+      if (format === 'tikz') {
+        return `\\usepackage{tikz}
+\\usepackage{pdfpages}
+
+% Set your PDF filename here
+\\newcommand{\\pdffilename}{yourfile.pdf}
+
+% Include a PDF page with overlay content
+% Usage: \\insertpdfpage{1}{\\BoxA{text}\\BoxB[c]{centered}}
+\\newcommand{\\insertpdfpage}[2]{%
+  \\includepdf[pages=#1,pagecommand={#2}]{\\pdffilename}%
+}`;
+      } else {
+        return `\\usepackage[absolute,overlay]{textpos}
+\\setlength{\\TPHorizModule}{1pt}
+\\setlength{\\TPVertModule}{1pt}
+\\usepackage{pdfpages}
+
+% Set your PDF filename here
+\\newcommand{\\pdffilename}{yourfile.pdf}
+
+% Include a PDF page with overlay content
+% Usage: \\insertpdfpage{1}{\\BoxA{text}\\BoxB[c]{centered}}
+\\newcommand{\\insertpdfpage}[2]{%
+  \\includepdf[pages=#1,pagecommand={#2}]{\\pdffilename}%
+}`;
+      }
+    }
+
+    function generateMacros() {
+      if (state.boxes.length === 0) return '';
+      
+      const format = getSelectedFormat();
+      let output = '';
+      
+      // Add usage comment
+      output += '% Box macros: \\BoxName{content} or \\BoxName[c]{centered content}\n\n';
+      
+      for (const box of state.boxes) {
+        if (format === 'tikz') {
+          // Calculate center position for centered mode
+          const centerX = box.x + box.width / 2;
+          const centerY = box.y + box.height / 2;
+          
+          output += `\\newcommand{\\${box.name}}[2][]{%\n`;
+          output += `  \\begin{tikzpicture}[remember picture, overlay]\n`;
+          output += `    \\ifx\\relax#1\\relax\n`;
+          output += `      % Normal: top-left aligned with text wrapping\n`;
+          output += `      \\node[anchor=north west, text width=${box.width.toFixed(2)}pt, inner sep=0pt]\n`;
+          output += `        at ([xshift=${box.x.toFixed(2)}pt, yshift=-${box.y.toFixed(2)}pt]current page.north west) {#2};\n`;
+          output += `    \\else\n`;
+          output += `      % Centered: both horizontally and vertically\n`;
+          output += `      \\node[anchor=center, text width=${box.width.toFixed(2)}pt, align=center, inner sep=0pt]\n`;
+          output += `        at ([xshift=${centerX.toFixed(2)}pt, yshift=-${centerY.toFixed(2)}pt]current page.north west) {#2};\n`;
+          output += `    \\fi\n`;
+          output += `  \\end{tikzpicture}%\n`;
+          output += `}\n\n`;
+        } else {
+          // textpos version with centering support
+          const centerX = box.x + box.width / 2;
+          const centerY = box.y + box.height / 2;
+          
+          output += `\\newcommand{\\${box.name}}[2][]{%\n`;
+          output += `  \\ifx\\relax#1\\relax\n`;
+          output += `    % Normal: top-left aligned\n`;
+          output += `    \\begin{textblock*}{${box.width.toFixed(2)}pt}(${box.x.toFixed(2)}pt, ${box.y.toFixed(2)}pt)#2\\end{textblock*}%\n`;
+          output += `  \\else\n`;
+          output += `    % Centered: use a centered parbox\n`;
+          output += `    \\begin{textblock*}{${box.width.toFixed(2)}pt}(${box.x.toFixed(2)}pt, ${box.y.toFixed(2)}pt)%\n`;
+          output += `      \\parbox[c][${box.height.toFixed(2)}pt][c]{${box.width.toFixed(2)}pt}{\\centering #2}%\n`;
+          output += `    \\end{textblock*}%\n`;
+          output += `  \\fi\n`;
+          output += `}\n\n`;
+        }
+      }
+      
+      return output.trim();
+    }
+
+    function highlightLatex(code) {
+      if (!code) return '';
+      
+      // Escape HTML first
+      let html = escapeHtml(code);
+      
+      // Comments
+      html = html.replace(/(%.*)$/gm, '<span class="syn-comment">$1</span>');
+      
+      // Commands with arguments
+      html = html.replace(/(\\[a-zA-Z@]+)(\*?)(\[)/g, '<span class="syn-command">$1$2</span><span class="syn-bracket">$3</span>');
+      html = html.replace(/(\\[a-zA-Z@]+)(\*?)(\{)/g, '<span class="syn-command">$1$2</span><span class="syn-bracket">$3</span>');
+      html = html.replace(/(\\[a-zA-Z@]+)(\*?)/g, '<span class="syn-command">$1$2</span>');
+      
+      // Brackets
+      html = html.replace(/(\{|\}|\[|\])/g, '<span class="syn-bracket">$1</span>');
+      
+      // Numbers with units
+      html = html.replace(/(\d+\.?\d*)(pt|cm|mm|in|em|ex)/g, '<span class="syn-number">$1</span><span class="syn-keyword">$2</span>');
+      
+      return html;
+    }
+
+    function updateLatexOutput() {
+      const preamble = generatePreamble();
+      const macros = generateMacros();
+      
+      latexPreamble.innerHTML = highlightLatex(preamble);
+      latexMacros.innerHTML = highlightLatex(macros);
+    }
+
+    formatRadios.forEach(radio => {
+      radio.addEventListener('change', updateLatexOutput);
+    });
+
+    // Copy functionality
+    async function copyToClipboard(text, button) {
+      if (!text) return;
+      
+      try {
+        await navigator.clipboard.writeText(text);
+        const originalText = button.innerHTML;
+        button.innerHTML = '<span class="copy-icon">✓</span> Copied!';
+        button.classList.add('copied');
+        setTimeout(() => {
+          button.innerHTML = originalText;
+          button.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
+
+    copyPreambleBtn.addEventListener('click', () => {
+      copyToClipboard(generatePreamble(), copyPreambleBtn);
+    });
+
+    copyMacrosBtn.addEventListener('click', () => {
+      copyToClipboard(generateMacros(), copyMacrosBtn);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (!state.pdfDoc) return;
+      
+      // Delete selected box
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedBoxId) {
+        // Don't delete if editing a name
+        if (document.activeElement.classList.contains('box-name')) return;
+        
+        state.boxes = state.boxes.filter(b => b.id !== state.selectedBoxId);
+        state.selectedBoxId = null;
+        updateBoxList();
+        updateLatexOutput();
+        redrawAllBoxes();
+      }
+      
+      // Escape to deselect
+      if (e.key === 'Escape') {
+        state.selectedBoxId = null;
+        updateBoxList();
+        redrawAllBoxes();
+      }
+    });
+
+    // Initial preamble display
+    updateLatexOutput();
+  </script>
+</body>
+</html>
