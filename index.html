@@ -213,7 +213,7 @@
       opacity: 0.5;
     }
 
-    /* Resizer */
+    /* Resizer (horizontal - between PDF and sidebar) */
     .resizer {
       width: 6px;
       background: var(--border);
@@ -224,6 +224,20 @@
 
     .resizer:hover,
     .resizer.active {
+      background: var(--accent);
+    }
+
+    /* Resizer (vertical - between sidebar sections) */
+    .section-resizer {
+      height: 6px;
+      background: var(--border);
+      cursor: row-resize;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .section-resizer:hover,
+    .section-resizer.active {
       background: var(--accent);
     }
 
@@ -242,15 +256,17 @@
     .sidebar-section {
       display: flex;
       flex-direction: column;
-      border-bottom: 1px solid var(--border);
+      min-height: 60px;
+      overflow: hidden;
     }
 
     .sidebar-section.flex-grow {
       flex: 1;
-      min-height: 0;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      min-height: 100px;
+    }
+
+    .sidebar-section.resizable {
+      flex-shrink: 0;
     }
 
     .sidebar-header {
@@ -277,11 +293,15 @@
     }
 
     /* Box List */
+    .box-list-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
     .box-list {
       list-style: none;
       padding: 0.5rem;
-      max-height: 180px;
-      overflow-y: auto;
     }
 
     .box-list:empty::before {
@@ -292,6 +312,15 @@
       font-size: 0.875rem;
       font-style: italic;
       text-align: center;
+    }
+
+    .box-hint {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      background: var(--bg-primary);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
     }
 
     .box-item {
@@ -455,13 +484,17 @@
     }
 
     .latex-output.preamble {
-      max-height: 180px;
-      flex-shrink: 0;
+      flex: 1;
+      min-height: 40px;
     }
 
     .latex-output.macros {
       flex: 1;
-      min-height: 100px;
+      min-height: 40px;
+    }
+
+    .latex-block.resizable {
+      flex-shrink: 0;
     }
 
     .latex-output:empty::before {
@@ -539,12 +572,17 @@
     <div id="resizer" class="resizer"></div>
 
     <aside id="sidebar" class="sidebar">
-      <div class="sidebar-section">
+      <div class="sidebar-section resizable" id="section-boxes" style="height: 200px;">
         <div class="sidebar-header">Bounding Boxes</div>
-        <ul id="box-list" class="box-list"></ul>
+        <div class="box-list-wrapper">
+          <ul id="box-list" class="box-list"></ul>
+        </div>
+        <div class="box-hint">Names must start with A-Z and a-z characters.</div>
       </div>
 
-      <div class="sidebar-section">
+      <div class="section-resizer" data-resize-above="section-boxes"></div>
+
+      <div class="sidebar-section resizable" id="section-format" style="height: 70px;">
         <div class="sidebar-header">Output Format</div>
         <div class="sidebar-content">
           <div class="format-options">
@@ -560,10 +598,12 @@
         </div>
       </div>
 
-      <div class="sidebar-section flex-grow">
+      <div class="section-resizer" data-resize-above="section-format"></div>
+
+      <div class="sidebar-section flex-grow" id="section-latex">
         <div class="sidebar-header">LaTeX Output</div>
         <div class="latex-section">
-          <div class="latex-block">
+          <div class="latex-block resizable" id="block-preamble" style="height: 160px;">
             <div class="latex-block-header">
               <span class="latex-block-title">Preamble</span>
               <button class="copy-icon-btn" id="copy-preamble-btn" title="Copy preamble">
@@ -572,6 +612,7 @@
             </div>
             <div id="latex-preamble" class="latex-output preamble"></div>
           </div>
+          <div class="section-resizer" data-resize-above="block-preamble"></div>
           <div class="latex-block flex-grow">
             <div class="latex-block-header">
               <span class="latex-block-title">Macros</span>
@@ -661,6 +702,47 @@
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
       }
+      if (sectionResizing) {
+        sectionResizing = false;
+        if (activeSectionResizer) {
+          activeSectionResizer.classList.remove('active');
+          activeSectionResizer = null;
+        }
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+
+    // Section resizer functionality (vertical)
+    let sectionResizing = false;
+    let activeSectionResizer = null;
+    let resizeTarget = null;
+    let resizeStartY = 0;
+    let resizeStartHeight = 0;
+
+    document.querySelectorAll('.section-resizer').forEach(resizer => {
+      resizer.addEventListener('mousedown', (e) => {
+        sectionResizing = true;
+        activeSectionResizer = resizer;
+        resizer.classList.add('active');
+        
+        const targetId = resizer.dataset.resizeAbove;
+        resizeTarget = document.getElementById(targetId);
+        resizeStartY = e.clientY;
+        resizeStartHeight = resizeTarget.offsetHeight;
+        
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!sectionResizing || !resizeTarget) return;
+      
+      const deltaY = e.clientY - resizeStartY;
+      const newHeight = Math.max(60, resizeStartHeight + deltaY);
+      resizeTarget.style.height = newHeight + 'px';
     });
 
     // PDF Loading
@@ -928,11 +1010,34 @@
       }
     }
 
-    // Zoom handling
+    // Zoom handling - preserve scroll position
     zoomSelect.addEventListener('change', async () => {
       state.zoomMode = zoomSelect.value;
       if (state.pdfDoc) {
+        // Find which page is currently most visible
+        const containerRect = pdfScrollContainer.getBoundingClientRect();
+        const containerCenter = containerRect.top + containerRect.height / 2;
+        let visiblePage = 1;
+        let minDistance = Infinity;
+        
+        for (const pageData of state.pages) {
+          const pageRect = pageData.canvas.getBoundingClientRect();
+          const pageCenter = pageRect.top + pageRect.height / 2;
+          const distance = Math.abs(pageCenter - containerCenter);
+          if (distance < minDistance) {
+            minDistance = distance;
+            visiblePage = pageData.pageNum;
+          }
+        }
+        
+        // Re-render all pages
         await renderAllPages();
+        
+        // Scroll back to the same page
+        const pageContainer = pdfScrollContainer.querySelector(`.page-container[data-page="${visiblePage}"]`);
+        if (pageContainer) {
+          pageContainer.scrollIntoView({ block: 'center' });
+        }
       }
     });
 
