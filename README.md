@@ -1,25 +1,14 @@
 # Latex Bounding Box Aligner
 
-## Usage
+This tool is a single HTML + Javascript webpage which helps you overlay custom LaTeX content onto existing PDF pages. Common use cases include:
 
-The website contains all the LaTeX you need. To avoid copy-pasting the static preamble each time we provide `bounding-box-aligner-preamble.tex` which you can import into all your LaTeX documents.
+- **Homework answers**: fill in solutions on a PDF with specific answer boxes
+- **Form filling**: add typed content to PDF forms
+- **General annotations**: place text, equations, or diagrams at precise locations on any PDF
 
-### Patterns
+The tool does **not** modify your PDF. Instead, it generates LaTeX macros that position content at exact coordinates when you include the PDF in a LaTeX document which you compile yourself. You write the content and LaTeX will place it within that box.
 
-#### Importing `bounding-box-aligner-preamble.tex`
-
-1. Determine the file path of `bounding-box-aligner-preamble.tex`.
-2. Import the file with `\input{/path/to/bounding-box-aligner-preamble.tex}`
-
-#### Inserting the PDF's Next Page
-
-Add `\nextpage`.
-
-## Features
-
-1. Well-defined bounding box overflow: if you add too much text in a bounding box area, it'll just overflow, with no weird behavior.
-2. Font size changes work within bounding box: this means you can make the font smaller with `\tiny` if you need lots more room.
-3. Portable: a single, serverless webpage with HTML, CSS, and Javascript.
+See [tutorial.md](./tutorial.md) for a complete tutorial.
 
 ## Demo
 
