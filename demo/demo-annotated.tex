@@ -1,0 +1,75 @@
+\documentclass[12pt]{article}
+\usepackage{tikz}
+\usepackage{pdfpages}
+\usepackage{lipsum}
+
+% Set your PDF filename here
+\newcommand{\pdffilename}{demo.pdf}
+
+% Include a PDF page with overlay content
+% Usage: \insertpdfpage{1}{\BoxA{text}\BoxB[c]{centered}}
+\newcommand{\insertpdfpage}[2]{%
+  \includepdf[pages=#1,pagecommand={#2}]{\pdffilename}%
+}
+% Box macros: \BoxName{content} or \BoxName[c]{centered content}
+
+\newcommand{\NameDate}[2][]{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \ifx\relax#1\relax
+      % Normal: top-left aligned with text wrapping
+      \node[anchor=north west, text width=108.67pt, inner sep=0pt]
+        at ([xshift=132.33pt, yshift=-132.67pt]current page.north west) {#2};
+    \else
+      % Centered: both horizontally and vertically
+      \node[anchor=center, text width=108.67pt, align=center, inner sep=0pt]
+        at ([xshift=186.67pt, yshift=-159.67pt]current page.north west) {#2};
+    \fi
+  \end{tikzpicture}%
+}
+
+\newcommand{\Work}[2][]{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \ifx\relax#1\relax
+      % Normal: top-left aligned with text wrapping
+      \node[anchor=north west, text width=433.33pt, inner sep=0pt]
+        at ([xshift=94.33pt, yshift=-347.33pt]current page.north west) {#2};
+    \else
+      % Centered: both horizontally and vertically
+      \node[anchor=center, text width=433.33pt, align=center, inner sep=0pt]
+        at ([xshift=311.00pt, yshift=-456.33pt]current page.north west) {#2};
+    \fi
+  \end{tikzpicture}%
+}
+
+\newcommand{\Answer}[2][]{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \ifx\relax#1\relax
+      % Normal: top-left aligned with text wrapping
+      \node[anchor=north west, text width=183.33pt, inner sep=0pt]
+        at ([xshift=348.33pt, yshift=-592.67pt]current page.north west) {#2};
+    \else
+      % Centered: both horizontally and vertically
+      \node[anchor=center, text width=183.33pt, align=center, inner sep=0pt]
+        at ([xshift=440.00pt, yshift=-623.00pt]current page.north west) {#2};
+    \fi
+  \end{tikzpicture}%
+}
+
+\begin{document}
+
+\thispagestyle{empty} % Remove page numbers from this PDF (use from base PDF)
+
+\insertpdfpage{1}{
+  \NameDate{
+    \vspace{-0.5mm}\\
+    Your Name\\
+    \bigskip
+    \vspace{3mm}
+    2026-02-14}
+  \Work{
+    Try solving this yourself as an exercise, it's only a 5th-order polynomial.
+  }
+  \Answer{Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Ut purus elit, vestibulum ut, placerat ac, adipiscing vitae, felis.}
+}
+
+\end{document}
