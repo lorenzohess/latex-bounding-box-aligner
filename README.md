@@ -10,6 +10,14 @@ The tool does **not** modify your PDF. Instead, it generates LaTeX macros that p
 
 See [tutorial.md](./tutorial.md) for a complete tutorial.
 
+**Here's the website with bounding boxes added:**
+
+![](./demo/demo-website.png)
+
+**The resulting PDF:** [demo-annotated.pdf](./demo/demo-annotated.pdf)
+
+**The underlying LaTeX to generate the PDF:** [demo-annotated.tex](./demo/demo-annotated.tex)
+
 ## Demo
 
-For a demo, load demo.html. Open demo-base.pdf to see how the bounding boxes look when added. Then, open demo-annotated.tex and demo-annotated.pdf to see how the LaTeX commands are used and to see the resulting PDF.
+To see how the demo was implemented see `demo-annotated.tex` and `demo-annotated.pdf`. You can try yourself by opening `demo.pdf` in the app.
